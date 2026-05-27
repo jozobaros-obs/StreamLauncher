@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' https://api.themoviedb.org https://image.tmdb.org;
+                 img-src 'self' data: https://image.tmdb.org;
+                 style-src 'self' 'unsafe-inline';
+                 script-src 'self' 'unsafe-inline';" />
+  <title>StreamLauncher</title>
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     CUSTOM TITLE BAR (frameless window)
+════════════════════════════════════════════════════════════════════════ -->
+<div id="titlebar">
+  <div class="tb-drag">
+    <span class="tb-logo">▶ StreamLauncher</span>
+  </div>
+  <div class="tb-controls">
+    <button onclick="window.electronAPI.minimize()" title="Minimize">─</button>
+    <button onclick="window.electronAPI.maximize()" title="Maximize">□</button>
+    <button class="close-btn" onclick="window.electronAPI.close()" title="Close">✕</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     PLAYER TOOLBAR (shown over BrowserView when streaming)
+════════════════════════════════════════════════════════════════════════ -->
+<div id="player-bar" class="hidden">
+  <button id="btn-back-player" class="player-btn" onclick="closePlayer()">
+    ← Back
+  </button>
+  <span id="player-title" class="player-title"></span>
+  <div class="player-controls">
+    <span id="sub-status" class="sub-status"></span>
+    <button class="player-btn" onclick="loadSubtitle()" title="Load .srt / .vtt subtitle file">
+      ⬛ Subtitles
+    </button>
+    <button class="player-btn sm" onclick="adjustOffset(-0.5)" title="Subtitle −0.5s">–0.5s</button>
+    <button class="player-btn sm" onclick="adjustOffset(0.5)"  title="Subtitle +0.5s">+0.5s</button>
+    <button class="player-btn sm" onclick="clearSubtitle()" title="Remove subtitles">✕ Sub</button>
+    <span class="adblock-badge">🛡 AdBlock ON</span>
+    <button class="player-btn" onclick="window.electronAPI.minimize()">─</button>
+    <button class="player-btn" onclick="window.electronAPI.maximize()">□</button>
+    <button class="player-btn close-btn" onclick="closePlayer()">✕</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     VIEW: HOME / LAUNCHER
+════════════════════════════════════════════════════════════════════════ -->
+<div id="view-home" class="view active">
+
+  <!-- Header Nav -->
+  <header class="header">
+    <nav class="nav">
+      <a class="nav-link active" onclick="showSection('movies')">Movies</a>
+      <a class="nav-link" onclick="showSection('tv')">TV Shows</a>
+      <a class="nav-link" onclick="showSection('sports')">Sports</a>
+      <a class="nav-link" onclick="showView('view-sites')">Sources</a>
+    </nav>
+    <div class="search-wrap">
+      <input id="search-input" type="text" placeholder="Search movies, shows…"
+             oninput="onSearchInput(this.value)"
+             onkeydown="onSearchKey(event)" />
+      <span class="search-icon">🔍</span>
+      <div id="search-dropdown" class="search-dropdown hidden"></div>
+    </div>
+    <button class="settings-btn" onclick="showView('view-settings')" title="Settings">⚙</button>
+  </header>
+
+  <!-- Hero Banner -->
+  <div id="hero" class="hero">
+    <div id="hero-backdrop" class="hero-backdrop"></div>
+    <div class="hero-overlay"></div>
+    <div id="hero-content" class="hero-content">
+      <div id="hero-badge" class="hero-badge"></div>
+      <h1 id="hero-title" class="hero-title">Loading…</h1>
+      <p  id="hero-meta"  class="hero-meta"></p>
+      <p  id="hero-desc"  class="hero-desc"></p>
+      <div class="hero-btns">
+        <button id="hero-play" class="btn-primary" onclick="heroPlay()">▶ Watch Now</button>
+        <button id="hero-info" class="btn-secondary" onclick="heroInfo()">ℹ More Info</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content Rows -->
+  <div class="content-area">
+    <section id="section-movies" class="section active">
+      <h2 class="row-title">🔥 Trending Movies</h2>
+      <div id="row-movies" class="row"></div>
+      <h2 class="row-title">⭐ Top Rated Movies</h2>
+      <div id="row-movies-top" class="row"></div>
+    </section>
+
+    <section id="section-tv" class="section">
+      <h2 class="row-title">📺 Trending TV Shows</h2>
+      <div id="row-tv" class="row"></div>
+      <h2 class="row-title">⭐ Top Rated TV</h2>
+      <div id="row-tv-top" class="row"></div>
+    </section>
+
+    <section id="section-sports" class="section">
+      <h2 class="row-title">⚽ Sports Channels — via Cineby</h2>
+      <div id="row-sports" class="row"></div>
+    </section>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     VIEW: SEARCH RESULTS
+════════════════════════════════════════════════════════════════════════ -->
+<div id="view-search" class="view">
+  <div class="view-header">
+    <button class="back-btn" onclick="showView('view-home')">← Back</button>
+    <input id="search-full" type="text" class="search-full-input"
+           placeholder="Search…" oninput="doFullSearch(this.value)" />
+  </div>
+  <div class="view-body">
+    <h2 id="search-heading" class="row-title"></h2>
+    <div id="search-results" class="card-grid"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     VIEW: CONTENT DETAIL
+════════════════════════════════════════════════════════════════════════ -->
+<div id="view-detail" class="view">
+  <div id="detail-backdrop" class="detail-backdrop"></div>
+  <div class="detail-overlay"></div>
+  <div class="detail-scroll">
+    <button class="back-btn floating" onclick="goBackFromDetail()">← Back</button>
+    <div class="detail-body">
+      <div class="detail-left">
+        <img id="detail-poster" class="detail-poster" src="" alt="" />
+      </div>
+      <div class="detail-right">
+        <div id="detail-badges" class="detail-badges"></div>
+        <h1 id="detail-title"    class="detail-title"></h1>
+        <p  id="detail-meta"     class="detail-meta"></p>
+        <p  id="detail-overview" class="detail-overview"></p>
+
+        <!-- TV Season / Episode Selector -->
+        <div id="episode-picker" class="episode-picker hidden">
+          <div class="picker-row">
+            <label>Season</label>
+            <select id="season-select" onchange="onSeasonChange(this.value)"></select>
+            <label>Episode</label>
+            <select id="episode-select"></select>
+          </div>
+        </div>
+
+        <!-- Source Selector -->
+        <div class="source-section">
+          <h3 class="source-heading">Choose Source</h3>
+          <div id="source-grid" class="source-grid"></div>
+        </div>
+        <p class="source-note">
+          🛡 All sources open with ad blocking & popup protection enabled.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     VIEW: STREAMING SOURCES LIST
+════════════════════════════════════════════════════════════════════════ -->
+<div id="view-sites" class="view">
+  <div class="view-header">
+    <button class="back-btn" onclick="showView('view-home')">← Back</button>
+    <h2>All Streaming Sources</h2>
+  </div>
+  <div class="view-body">
+    <div id="sites-grid" class="sites-grid"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     VIEW: SETTINGS
+════════════════════════════════════════════════════════════════════════ -->
+<div id="view-settings" class="view">
+  <div class="view-header">
+    <button class="back-btn" onclick="showView('view-home')">← Back</button>
+    <h2>Settings</h2>
+  </div>
+  <div class="view-body settings-body">
+
+    <div class="settings-section">
+      <h3>TMDB API Key</h3>
+      <p class="setting-desc">
+        Required for search and trending content.<br/>
+        Get a free key at
+        <a href="#" onclick="window.electronAPI.openExternal('https://www.themoviedb.org/settings/api')">
+          themoviedb.org/settings/api
+        </a>
+      </p>
+      <div class="setting-row">
+        <input id="tmdb-key-input" type="password" class="setting-input"
+               placeholder="Paste your TMDB API v3 key here…" />
+        <button class="btn-primary" onclick="saveTmdbKey()">Save</button>
+      </div>
+      <p id="tmdb-status" class="setting-status"></p>
+    </div>
+
+    <div class="settings-section">
+      <h3>Ad Blocking</h3>
+      <p class="setting-desc">
+        Ad blocking and popup protection is always <strong>ON</strong> for all streaming sources.
+        Anti-redirect is also active — attempts to navigate away from the streaming site are blocked automatically.
+      </p>
+      <div class="adblock-indicators">
+        <span class="indicator on">🛡 Domain Blocklist</span>
+        <span class="indicator on">🚫 Popup Blocker</span>
+        <span class="indicator on">↩ Anti-Redirect</span>
+        <span class="indicator on">⛏ Anti-Miner</span>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>Subtitles</h3>
+      <p class="setting-desc">
+        While in the player, click <strong>⬛ Subtitles</strong> in the toolbar to load a
+        <code>.srt</code> or <code>.vtt</code> file. Use <code>–0.5s / +0.5s</code> to
+        sync the timing. Subtitles render as an overlay on top of the video.
+      </p>
+    </div>
+
+    <div class="settings-section">
+      <h3>Keyboard Shortcuts</h3>
+      <div class="shortcuts">
+        <div class="shortcut-row"><kbd>Esc</kbd><span>Exit player</span></div>
+        <div class="shortcut-row"><kbd>F11</kbd><span>Toggle fullscreen</span></div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>About</h3>
+      <p class="setting-desc">
+        StreamLauncher v1.0.0 — Free streaming launcher using FMHY sources.<br/>
+        All streaming content is provided by third-party sites. No content is hosted locally.
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     TOAST NOTIFICATION
+════════════════════════════════════════════════════════════════════════ -->
+<div id="toast" class="toast hidden"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     LOADING SPINNER
+════════════════════════════════════════════════════════════════════════ -->
+<div id="spinner" class="spinner hidden">
+  <div class="spin-ring"></div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
