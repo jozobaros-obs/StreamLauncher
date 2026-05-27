@@ -41,7 +41,15 @@ jobs:
           cp renderer/index.html  android/app/src/main/assets/index.html
           cp renderer/css/app.css android/app/src/main/assets/css/app.css
           cp renderer/js/app.js   android/app/src/main/assets/js/app.js
-
+      - name: Create gradle.properties
+        run: |
+          cat > android/gradle.properties << 'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          kotlin.code.style=official
+          EOF
+          
       - name: Build Debug APK
         working-directory: android
         run: gradle assembleDebug --no-daemon --stacktrace
